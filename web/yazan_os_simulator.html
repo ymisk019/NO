@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yazan Game OS - محاكي نظام التشغيل والألعاب</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
+  body { background: #0b0f19; overflow: hidden; height: 100vh; display: flex; flex-direction: column; color: #fff; }
+  
+  /* Desktop */
+  #desktop {
+    flex: 1; position: relative; background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 60%, #020617 100%);
+    overflow: hidden;
+  }
+  .bg-grid {
+    position: absolute; bottom: 0; left: 0; width: 100%; height: 50%;
+    background-image: linear-gradient(rgba(30, 41, 59, 0.4) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(30, 41, 59, 0.4) 1px, transparent 1px);
+    background-size: 40px 40px;
+    perspective: 500px;
+    transform: perspective(300px) rotateX(45deg);
+    transform-origin: bottom center;
+    pointer-events: none;
+  }
+  .watermark {
+    position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 54px; font-weight: 900; color: rgba(255, 255, 255, 0.04);
+    letter-spacing: 6px; pointer-events: none; text-align: center;
+  }
+
+  /* Icons */
+  .desktop-icons {
+    position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 16px; z-index: 10;
+  }
+  .icon-btn {
+    display: flex; flex-direction: column; align-items: center; width: 84px; padding: 8px 4px;
+    border-radius: 10px; cursor: pointer; transition: 0.2s; text-align: center;
+  }
+  .icon-btn:hover { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(5px); }
+  .icon-badge {
+    width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; box-shadow: 0 8px 16px rgba(0,0,0,0.4); margin-bottom: 6px;
+  }
+  .icon-label { font-size: 11px; font-weight: bold; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+
+  /* Windows */
+  .window {
+    position: absolute; background: #1e222b; border: 1px solid #334155; border-radius: 10px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.6); display: flex; flex-direction: column; overflow: hidden;
+    z-index: 100; min-width: 320px; min-height: 240px;
+  }
+  .window.active { border-color: #00d2d3; box-shadow: 0 20px 50px rgba(0, 210, 211, 0.25); }
+  .titlebar {
+    height: 34px; background: linear-gradient(90deg, #0f172a, #1e293b); display: flex; align-items: center;
+    justify-content: space-between; padding: 0 12px; cursor: move; border-bottom: 1px solid #334155;
+  }
+  .win-title { font-size: 13px; font-weight: bold; color: #f8fafc; }
+  .win-controls { display: flex; gap: 8px; }
+  .win-btn { width: 14px; height: 14px; border-radius: 50%; cursor: pointer; border: none; }
+  .win-close { background: #ef4444; }
+  .win-min { background: #eab308; }
+  .client-area { flex: 1; position: relative; background: #0f172a; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* Taskbar */
+  #taskbar {
+    height: 44px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px);
+    border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; z-index: 999;
+  }
+  .start-btn {
+    display: flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #0052d4, #4364f7);
+    padding: 6px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px;
+    box-shadow: 0 4px 12px rgba(67, 100, 247, 0.4); transition: 0.2s;
+  }
+  .start-btn:hover { transform: scale(1.03); }
+  .task-items { display: flex; gap: 8px; flex: 1; margin: 0 16px; }
+  .task-tab {
+    background: #1e293b; padding: 4px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    border: 1px solid #334155; display: flex; align-items: center; gap: 6px;
+  }
+  .task-tab.active { background: #0052d4; border-color: #00d2d3; }
+  .systray { display: flex; align-items: center; gap: 14px; font-size: 13px; }
+  .tray-badge { background: #1e293b; padding: 4px 10px; border-radius: 6px; cursor: pointer; border: 1px solid #334155; }
+
+  /* Start Menu */
+  #start-menu {
+    position: absolute; bottom: 50px; right: 12px; width: 300px; background: #141922;
+    border: 1px solid #334155; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+    display: none; flex-direction: column; overflow: hidden; z-index: 1000;
+  }
+  .sm-header {
+    background: linear-gradient(90deg, #0052d4, #4364f7); padding: 16px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .sm-list { padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+  .sm-item {
+    display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; transition: 0.15s;
+  }
+  .sm-item:hover { background: #1e293b; color: #00d2d3; }
+  .sm-footer { padding: 10px; background: #0d1117; display: flex; justify-content: space-between; border-top: 1px solid #21262d; }
+  .pwr-btn { padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; }
+  .pwr-off { background: #dc2626; color: #fff; }
+  .pwr-rst { background: #2563eb; color: #fff; }
+
+  /* Game Canvas */
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+
+<div id="desktop">
+  <div class="bg-grid"></div>
+  <div class="watermark">YAZAN GAME OS<br><span style="font-size: 20px; font-weight: normal; opacity: 0.6;">نظام التشغيل للألعاب الحقيقي</span></div>
+
+  <div class="desktop-icons">
+    <div class="icon-btn" onclick="openGame('adventure')">
+      <div class="icon-badge" style="background:#e67e22;">🗡️</div>
+      <div class="icon-label">مغامرات يزن</div>
+    </div>
+    <div class="icon-btn" onclick="openGame('racing')">
+      <div class="icon-badge" style="background:#e74c3c;">🏎️</div>
+      <div class="icon-label">سباق الصحراء</div>
+    </div>
+    <div class="icon-btn" onclick="openGame('platformer')">
+      <div class="icon-badge" style="background:#2ecc71;">🦘</div>
+      <div class="icon-label">قفزة السايبر</div>
+    </div>
+    <div class="icon-btn" onclick="openGame('shooter')">
+      <div class="icon-badge" style="background:#00d2d3;">🚀</div>
+      <div class="icon-label">حامي المجرة</div>
+    </div>
+    <div class="icon-btn" onclick="openGame('puzzle')">
+      <div class="icon-badge" style="background:#f39c12;">🧩</div>
+      <div class="icon-label">مكعبات الذكاء</div>
+    </div>
+    <div class="icon-btn" onclick="openStore()">
+      <div class="icon-badge" style="background:#9b59b6;">🏪</div>
+      <div class="icon-label">متجر الألعاب</div>
+    </div>
+  </div>
+</div>
+
+<!-- Taskbar -->
+<div id="taskbar">
+  <div class="start-btn" onclick="toggleStartMenu()">🎮 ابدأ | Start</div>
+  <div class="task-items" id="task-items"></div>
+  <div class="systray">
+    <div class="tray-badge" onclick="toggleMute()" id="sound-btn">🔊 الصوت</div>
+    <div class="tray-badge" id="lang-btn">AR</div>
+    <div class="clock" id="clock">12:00</div>
+  </div>
+</div>
+
+<!-- Start Menu -->
+<div id="start-menu">
+  <div class="sm-header">
+    <div style="font-size: 16px; font-weight: bold;">YAZAN GAME OS</div>
+    <div style="font-size: 11px; opacity: 0.8;">نظام تشغيل الألعاب المستقل v1.0</div>
+  </div>
+  <div class="sm-list">
+    <div class="sm-item" onclick="openGame('adventure')">🗡️ مغامرات يزن (Adventure)</div>
+    <div class="sm-item" onclick="openGame('racing')">🏎️ سباق الصحراء (Racing)</div>
+    <div class="sm-item" onclick="openGame('platformer')">🦘 قفزة السايبر (Platformer)</div>
+    <div class="sm-item" onclick="openGame('shooter')">🚀 حامي المجرة (Shooter)</div>
+    <div class="sm-item" onclick="openGame('puzzle')">🧩 مكعبات الذكاء (2048)</div>
+    <div class="sm-item" onclick="openStore()">🏪 متجر وحزم الألعاب (.YGP)</div>
+  </div>
+  <div class="sm-footer">
+    <button class="pwr-btn pwr-off" onclick="alert('تم إيقاف تشغيل Yazan Game OS.')">إطفاء</button>
+    <button class="pwr-btn pwr-rst" onclick="location.reload()">إعادة تشغيل</button>
+  </div>
+</div>
+
+<script>
+// Clock
+function updateClock() {
+  const d = new Date();
+  document.getElementById('clock').innerText = d.toTimeString().substring(0, 5);
+}
+setInterval(updateClock, 1000); updateClock();
+
+// Start menu toggle
+function toggleStartMenu() {
+  const sm = document.getElementById('start-menu');
+  sm.style.display = (sm.style.display === 'flex') ? 'none' : 'flex';
+}
+document.getElementById('desktop').addEventListener('click', () => {
+  document.getElementById('start-menu').style.display = 'none';
+});
+
+// Sound synthesizer using Web Audio API (PC Speaker simulation)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let soundEnabled = true;
+function playBeep(freq, type = 'square', dur = 0.08) {
+  if (!soundEnabled) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + dur);
+  } catch(e) {}
+}
+function toggleMute() {
+  soundEnabled = !soundEnabled;
+  document.getElementById('sound-btn').innerText = soundEnabled ? '🔊 الصوت' : '🔇 مكتوم';
+}
+
+// Window Management
+let winCount = 0;
+function createWindow(title, width, height, contentInit) {
+  winCount++;
+  const id = 'win-' + winCount;
+  const win = document.createElement('div');
+  win.className = 'window active';
+  win.id = id;
+  win.style.width = width + 'px';
+  win.style.height = height + 'px';
+  win.style.left = (60 + (winCount * 30) % 200) + 'px';
+  win.style.top = (40 + (winCount * 30) % 150) + 'px';
+
+  win.innerHTML = `
+    <div class="titlebar" onmousedown="startDrag(event, '${id}')">
+      <div class="win-title">${title}</div>
+      <div class="win-controls">
+        <button class="win-btn win-min" onclick="minWindow('${id}')"></button>
+        <button class="win-btn win-close" onclick="closeWindow('${id}')"></button>
+      </div>
+    </div>
+    <div class="client-area" id="${id}-client"></div>
+  `;
+
+  document.getElementById('desktop').appendChild(win);
+  addTab(id, title);
+  contentInit(document.getElementById(`${id}-client`));
+  playBeep(600, 'square', 0.05);
+}
+
+function closeWindow(id) {
+  const w = document.getElementById(id);
+  if (w) w.remove();
+  const t = document.getElementById('tab-' + id);
+  if (t) t.remove();
+}
+function minWindow(id) {
+  const w = document.getElementById(id);
+  if (w) w.style.display = (w.style.display === 'none') ? 'flex' : 'none';
+}
+function addTab(id, title) {
+  const tab = document.createElement('div');
+  tab.className = 'task-tab active';
+  tab.id = 'tab-' + id;
+  tab.innerText = title.substring(0, 15);
+  tab.onclick = () => minWindow(id);
+  document.getElementById('task-items').appendChild(tab);
+}
+
+// Dragging
+let dragWin = null, dragOffX = 0, dragOffY = 0;
+function startDrag(e, id) {
+  dragWin = document.getElementById(id);
+  dragOffX = e.clientX - dragWin.offsetLeft;
+  dragOffY = e.clientY - dragWin.offsetTop;
+}
+window.addEventListener('mousemove', (e) => {
+  if (dragWin) {
+    dragWin.style.left = (e.clientX - dragOffX) + 'px';
+    dragWin.style.top = (e.clientY - dragOffY) + 'px';
+  }
+});
+window.addEventListener('mouseup', () => dragWin = null);
+
+// -------------------------------------------------------------
+// GAME 1: YAZAN'S QUEST (مغامرات يزن)
+// -------------------------------------------------------------
+function startAdventure(container) {
+  container.innerHTML = `<canvas id="adv-cv" width="480" height="340"></canvas>`;
+  const cv = container.querySelector('#adv-cv');
+  const ctx = cv.getContext('2d');
+  let px = 1, py = 1, hp = 3, keys = 0, score = 0, won = false;
+  const map = [
+    [1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,1,0,3,0,0,1,4,1],
+    [1,0,1,0,2,0,0,1,0,0,0,1],
+    [1,0,1,0,1,1,0,1,1,1,0,1],
+    [1,4,0,0,0,0,0,0,0,1,0,1],
+    [1,1,1,1,0,1,1,1,0,2,0,1],
+    [1,0,0,0,0,1,3,0,0,1,5,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1]
+  ];
+  let skeleton = { x: 7, y: 4, dir: 1 };
+
+  function render() {
+    ctx.fillStyle = "#111827"; ctx.fillRect(0, 0, cv.width, cv.height);
+    // Draw map
+    for (let r=0; r<8; r++) {
+      for (let c=0; c<12; c++) {
+        let t = map[r][c];
+        let x = c * 40, y = r * 38 + 30;
+        if (t === 1) { ctx.fillStyle = "#374151"; ctx.fillRect(x, y, 38, 36); }
+        else if (t === 2) { ctx.fillStyle = "#78350f"; ctx.fillRect(x, y, 38, 36); ctx.fillStyle = "#facc15"; ctx.beginPath(); ctx.arc(x+19, y+18, 5, 0, 7); ctx.fill(); }
+        else if (t === 3) { ctx.fillStyle = "#0284c7"; ctx.beginPath(); ctx.arc(x+19, y+18, 8, 0, 7); ctx.fill(); } // gem
+        else if (t === 4) { ctx.fillStyle = "#eab308"; ctx.fillRect(x+12, y+14, 14, 8); } // key
+        else if (t === 5) { ctx.fillStyle = "#9333ea"; ctx.fillRect(x+6, y+6, 26, 26); } // goal
+      }
+    }
+    // Draw skeleton
+    ctx.fillStyle = "#e5e7eb"; ctx.fillRect(skeleton.x * 40 + 8, skeleton.y * 38 + 38, 24, 24);
+    // Draw Hero (Yazan)
+    ctx.fillStyle = "#2563eb"; ctx.fillRect(px * 40 + 8, py * 38 + 38, 24, 24);
+    ctx.fillStyle = "#fde047"; ctx.fillRect(px * 40 + 14, py * 38 + 42, 12, 8);
+
+    // HUD
+    ctx.fillStyle = "#1e293b"; ctx.fillRect(0, 0, cv.width, 30);
+    ctx.fillStyle = "#ef4444"; ctx.font = "bold 13px sans-serif"; ctx.fillText(`القلوب: ${hp} ❤️`, 10, 20);
+    ctx.fillStyle = "#facc15"; ctx.fillText(`المفاتيح: ${keys} 🔑`, 120, 20);
+    ctx.fillStyle = "#38bdf8"; ctx.fillText(`الجواهر: ${score} 💎`, 220, 20);
+
+    if (won) {
+      ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = "#22c55e"; ctx.font = "bold 24px sans-serif"; ctx.fillText("مبروك! انتصرت في مغامرات يزن! 🎉", 70, 160);
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    let dx = 0, dy = 0;
+    if (e.key === 'ArrowUp' || e.key === 'w') dy = -1;
+    if (e.key === 'ArrowDown' || e.key === 's') dy = 1;
+    if (e.key === 'ArrowLeft' || e.key === 'a') dx = -1;
+    if (e.key === 'ArrowRight' || e.key === 'd') dx = 1;
+    if (dx !== 0 || dy !== 0) {
+      let nx = px + dx, ny = py + dy;
+      if (nx >= 0 && nx < 12 && ny >= 0 && ny < 8) {
+        let t = map[ny][nx];
+        if (t === 1) playBeep(200);
+        else if (t === 2 && keys > 0) { keys--; map[ny][nx] = 0; playBeep(800); }
+        else if (t === 3) { score += 5; map[ny][nx] = 0; playBeep(1200); px = nx; py = ny; }
+        else if (t === 4) { keys++; map[ny][nx] = 0; playBeep(1000); px = nx; py = ny; }
+        else if (t === 5) { won = true; playBeep(1500, 'triangle', 0.3); }
+        else if (t === 0) { px = nx; py = ny; playBeep(400, 'sine', 0.03); }
+      }
+      render();
+    }
+  });
+  render();
+}
+
+// -------------------------------------------------------------
+// GAME 2: DESERT SPEED (سباق الصحراء)
+// -------------------------------------------------------------
+function startRacing(container) {
+  container.innerHTML = `<canvas id="race-cv" width="460" height="340"></canvas>`;
+  const cv = container.querySelector('#race-cv');
+  const ctx = cv.getContext('2d');
+  let carX = 210, speed = 6, score = 0, fuel = 100, crashed = false;
+  let traffic = [{x: 160, y: 40, col: '#3b82f6'}, {x: 260, y: 160, col: '#22c55e'}];
+  
+  function loop() {
+    if (!crashed) {
+      score += speed; fuel -= 0.1;
+      traffic.forEach(t => {
+        t.y += speed - 2;
+        if (t.y > 360) { t.y = -40; t.x = 140 + Math.random() * 180; }
+        if (Math.abs(t.x - carX) < 26 && Math.abs(t.y - 270) < 40) {
+          crashed = true; playBeep(150, 'sawtooth', 0.4);
+        }
+      });
+    }
+
+    // Draw Desert
+    ctx.fillStyle = "#d97706"; ctx.fillRect(0, 0, cv.width, cv.height);
+    // Draw Road
+    ctx.fillStyle = "#1e293b"; ctx.fillRect(120, 0, 220, cv.height);
+    // Road dashes
+    ctx.fillStyle = "#facc15";
+    for (let y = (score * 2) % 40; y < cv.height; y += 40) {
+      ctx.fillRect(225, y, 6, 20);
+    }
+    // Traffic
+    traffic.forEach(t => {
+      ctx.fillStyle = t.col; ctx.fillRect(t.x, t.y, 26, 42);
+    });
+    // Player Supercar
+    ctx.fillStyle = "#ef4444"; ctx.fillRect(carX, 270, 28, 46);
+    ctx.fillStyle = "#fff"; ctx.fillRect(carX + 11, 270, 6, 46);
+
+    // HUD
+    ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(10, 10, 100, 70);
+    ctx.fillStyle = "#38bdf8"; ctx.font = "bold 12px sans-serif";
+    ctx.fillText(`السرعة: ${speed*25} كم`, 16, 30);
+    ctx.fillText(`النقاط: ${Math.floor(score/10)}`, 16, 50);
+    ctx.fillText(`الوقود: ${Math.floor(fuel)}%`, 16, 70);
+
+    if (crashed) {
+      ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = "#ef4444"; ctx.font = "bold 24px sans-serif"; ctx.fillText("حادث تحطم! اضغط R للإعادة", 100, 170);
+    } else {
+      requestAnimationFrame(loop);
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') carX = Math.max(130, carX - 18);
+    if (e.key === 'ArrowRight' || e.key === 'd') carX = Math.min(310, carX + 18);
+    if (e.key === 'ArrowUp' || e.key === 'w') { speed = 10; playBeep(250, 'sawtooth', 0.05); }
+    if (e.key === 'r' && crashed) { crashed = false; carX = 210; fuel = 100; loop(); }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowUp' || e.key === 'w') speed = 6;
+  });
+  loop();
+}
+
+// -------------------------------------------------------------
+// GAME 3: CYBER JUMPER (قفزة السايبر)
+// -------------------------------------------------------------
+function startPlatformer(container) {
+  container.innerHTML = `<canvas id="plat-cv" width="460" height="340"></canvas>`;
+  const cv = container.querySelector('#plat-cv');
+  const ctx = cv.getContext('2d');
+  let px = 40, py = 250, vx = 0, vy = 0, onGround = false, jumps = 0, score = 0;
+  const plats = [
+    {x: 20, y: 300, w: 100}, {x: 150, y: 250, w: 80}, {x: 260, y: 200, w: 80},
+    {x: 180, y: 140, w: 80}, {x: 340, y: 100, w: 90}
+  ];
+  let coins = [{x: 180, y: 220}, {x: 290, y: 170}, {x: 210, y: 110}, {x: 380, y: 70}];
+
+  function loop() {
+    vy += 0.8; py += vy; px += vx; vx *= 0.8;
+    onGround = false;
+    plats.forEach(p => {
+      if (px + 20 > p.x && px < p.x + p.w && py + 24 >= p.y && py + 24 <= p.y + 12 && vy >= 0) {
+        py = p.y - 24; vy = 0; onGround = true; jumps = 0;
+      }
+    });
+    // Coins
+    coins = coins.filter(c => {
+      if (Math.hypot(px - c.x, py - c.y) < 25) {
+        score += 100; playBeep(1200); return false;
+      }
+      return true;
+    });
+
+    // Draw Sky
+    ctx.fillStyle = "#0f172a"; ctx.fillRect(0, 0, cv.width, cv.height);
+    // Draw Platforms
+    plats.forEach(p => {
+      ctx.fillStyle = "#1e293b"; ctx.fillRect(p.x, p.y, p.w, 14);
+      ctx.fillStyle = "#00d2d3"; ctx.fillRect(p.x, p.y, p.w, 3);
+    });
+    // Draw Coins
+    ctx.fillStyle = "#facc15";
+    coins.forEach(c => { ctx.beginPath(); ctx.arc(c.x, c.y, 7, 0, 7); ctx.fill(); });
+    // Draw Player
+    ctx.fillStyle = "#22c55e"; ctx.fillRect(px, py, 20, 24);
+    // Draw Goal
+    ctx.fillStyle = "#a855f7"; ctx.fillRect(390, 60, 24, 40);
+
+    ctx.fillStyle = "#fff"; ctx.font = "bold 13px sans-serif";
+    ctx.fillText(`النقاط: ${score}`, 16, 24);
+
+    if (py > 360) { px = 40; py = 250; vy = 0; playBeep(100); }
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') vx = -4;
+    if (e.key === 'ArrowRight' || e.key === 'd') vx = 4;
+    if ((e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') && jumps < 2) {
+      vy = -11; jumps++; playBeep(600 + jumps * 200);
+    }
+  });
+  loop();
+}
+
+// -------------------------------------------------------------
+// GAME 4: GALACTIC DEFENDER (حامي المجرة)
+// -------------------------------------------------------------
+function startShooter(container) {
+  container.innerHTML = `<canvas id="shoot-cv" width="460" height="340"></canvas>`;
+  const cv = container.querySelector('#shoot-cv');
+  const ctx = cv.getContext('2d');
+  let sx = 210, bullets = [], aliens = [], score = 0;
+
+  for (let r=0; r<2; r++) {
+    for (let c=0; c<6; c++) {
+      aliens.push({x: 50 + c * 60, y: 40 + r * 40, col: (r===0?'#ef4444':'#a855f7')});
+    }
+  }
+
+  function loop() {
+    bullets.forEach(b => b.y -= 8);
+    bullets = bullets.filter(b => b.y > 0);
+
+    // Collision
+    bullets.forEach(b => {
+      aliens = aliens.filter(a => {
+        if (Math.abs(b.x - a.x) < 20 && Math.abs(b.y - a.y) < 18) {
+          score += 50; playBeep(300, 'sawtooth', 0.1); return false;
+        }
+        return true;
+      });
+    });
+
+    ctx.fillStyle = "#050811"; ctx.fillRect(0, 0, cv.width, cv.height);
+    // Draw Aliens
+    aliens.forEach(a => {
+      ctx.fillStyle = a.col; ctx.fillRect(a.x - 14, a.y - 10, 28, 20);
+    });
+    // Draw Bullets
+    ctx.fillStyle = "#00d2d3";
+    bullets.forEach(b => ctx.fillRect(b.x - 2, b.y, 4, 10));
+    // Draw Ship
+    ctx.fillStyle = "#38bdf8"; ctx.fillRect(sx - 16, 300, 32, 22);
+    ctx.fillStyle = "#f97316"; ctx.fillRect(sx - 6, 322, 12, 6);
+
+    ctx.fillStyle = "#facc15"; ctx.font = "bold 13px sans-serif";
+    ctx.fillText(`النقاط: ${score}`, 16, 24);
+
+    if (aliens.length === 0) {
+      ctx.fillStyle = "#22c55e"; ctx.font = "bold 22px sans-serif";
+      ctx.fillText("انتصرت في حماية المجرة! 🏆", 110, 170);
+    } else {
+      requestAnimationFrame(loop);
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') sx = Math.max(20, sx - 16);
+    if (e.key === 'ArrowRight' || e.key === 'd') sx = Math.min(440, sx + 16);
+    if (e.key === ' ' || e.key === 'z') {
+      bullets.push({x: sx, y: 295}); playBeep(900, 'square', 0.04);
+    }
+  });
+  loop();
+}
+
+// -------------------------------------------------------------
+// GAME 5: MIND BLOCKS 2048 (مكعبات الذكاء)
+// -------------------------------------------------------------
+function startPuzzle(container) {
+  container.innerHTML = `<div id="puz-box" style="display:grid; grid-template-columns:repeat(4, 60px); gap:8px; margin:40px auto; width:264px;"></div>`;
+  const box = container.querySelector('#puz-box');
+  let grid = [[0,2,0,0],[0,0,4,0],[0,0,0,0],[0,2,0,0]];
+
+  function draw() {
+    box.innerHTML = '';
+    for (let r=0; r<4; r++) {
+      for (let c=0; c<4; c++) {
+        let v = grid[r][c];
+        let d = document.createElement('div');
+        d.style.width = '60px'; d.style.height = '60px'; d.style.borderRadius = '8px';
+        d.style.display = 'flex'; d.style.alignItems = 'center'; d.style.justifyContent = 'center';
+        d.style.fontWeight = 'bold'; d.style.fontSize = '20px';
+        d.style.background = v ? '#f59e0b' : '#1e293b';
+        d.style.color = '#fff'; d.innerText = v || '';
+        box.appendChild(d);
+      }
+    }
+  }
+  draw();
+}
+
+// -------------------------------------------------------------
+// STORE & EXTERNAL PACKAGES
+// -------------------------------------------------------------
+function openStore() {
+  createWindow("متجر وحزم الألعاب | Game Store", 520, 360, (el) => {
+    el.innerHTML = `
+      <div style="padding:20px; color:#fff;">
+        <h3 style="color:#00d2d3;">حزم الألعاب الديناميكية (.YGP)</h3>
+        <p style="font-size:12px; color:#94a3b8; margin:8px 0 16px;">أضف أي لعبة بصيغة .YGP في مجلد /store لتشغيلها فوراً دون إعادة بناء الـ ISO!</p>
+        <div style="background:#1e293b; padding:12px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div>
+            <b>🐍 لعبة الثعبان (Retro Snake YGP)</b><br>
+            <small style="color:#94a3b8;">حزمة ديناميكية جاهزة للاستيراد</small>
+          </div>
+          <button style="background:#22c55e; border:none; color:#fff; padding:6px 14px; border-radius:6px; cursor:pointer;" onclick="alert('تم تثبيت الحزمة بنجاح في Yazan Game OS!')">تثبيت وتجربة</button>
+        </div>
+      </div>
+    `;
+  });
+}
+
+function openGame(g) {
+  if (g === 'adventure') createWindow("مغامرات يزن | Yazan's Quest", 500, 380, startAdventure);
+  if (g === 'racing') createWindow("سباق الصحراء | Desert Speed", 480, 380, startRacing);
+  if (g === 'platformer') createWindow("قفزة السايبر | Cyber Jumper", 480, 380, startPlatformer);
+  if (g === 'shooter') createWindow("حامي المجرة | Galactic Defender", 480, 380, startShooter);
+  if (g === 'puzzle') createWindow("مكعبات الذكاء | Mind Blocks (2048)", 340, 300, startPuzzle);
+}
+
+// Launch default game
+openGame('adventure');
+</script>
+</body>
+</html>

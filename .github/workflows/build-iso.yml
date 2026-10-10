@@ -1,0 +1,65 @@
+name: Build Yazan Game OS Bootable ISO
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Toolchains and Dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            gcc-multilib \
+            g++-multilib \
+            nasm \
+            xorriso \
+            mtools \
+            grub-pc-bin \
+            grub-common \
+            qemu-system-x86 \
+            python3
+
+      - name: Verify Environment
+        run: |
+          g++ --version | head -n 1
+          nasm --version
+          ld --version | head -n 1
+          grub-mkrescue --version
+          python3 --version
+
+      - name: Build Kernel
+        run: make kernel.bin
+
+      - name: Build Bootable ISO (GRUB)
+        run: python3 tools/build_iso.py yazan-game-os.iso
+
+      - name: Verify ISO Structure and Multiboot Kernel
+        run: bash tools/verify_iso.sh yazan-game-os.iso
+
+      - name: Upload Bootable ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yazan-game-os-bootable-iso
+          path: yazan-game-os.iso
+          retention-days: 30
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: yazan-game-os.iso
+          draft: false
+          prerelease: false
+          generate_release_notes: true
